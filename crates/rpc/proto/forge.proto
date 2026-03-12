@@ -349,6 +349,8 @@ service Forge {
   rpc ApplyRackFirmware(RackFirmwareApplyRequest) returns (RackFirmwareApplyResponse);
   // Check the status of an async firmware update job
   rpc GetRackFirmwareJobStatus(RackFirmwareJobStatusRequest) returns (RackFirmwareJobStatusResponse);
+  // Get the history of rack firmware apply operations
+  rpc GetRackFirmwareHistory(RackFirmwareHistoryRequest) returns (RackFirmwareHistoryResponse);
 
   // Replace all expected machines in site
   rpc ReplaceAllExpectedMachines(ExpectedMachineList) returns (google.protobuf.Empty);
@@ -6677,6 +6679,27 @@ message RackFirmwareJobStatusResponse {
   string node_id = 5;
   string error_message = 6; // Populated if state is FAILED
   string result_json = 7; // Detailed result data on completion
+}
+
+message RackFirmwareHistoryRequest {
+  string firmware_id = 1;      // Optional: filter by firmware ID. Empty string means no filter.
+  repeated string rack_ids = 2; // Optional: filter by rack IDs. Empty list returns all racks.
+}
+
+message RackFirmwareHistoryResponse {
+  map<string, RackFirmwareHistoryRecords> histories = 1; // Keyed by rack ID
+}
+
+message RackFirmwareHistoryRecords {
+  repeated RackFirmwareHistoryRecord records = 1;
+}
+
+message RackFirmwareHistoryRecord {
+  string firmware_id = 1;
+  string rack_id = 2;
+  string firmware_type = 3;
+  string applied_at = 4;
+  bool firmware_available = 5; // Whether the firmware ID still exists and is available
 }
 
 message ModifyDPFStateRequest {
