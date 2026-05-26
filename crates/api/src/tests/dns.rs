@@ -19,6 +19,7 @@ use std::net::IpAddr;
 use carbide_uuid::machine::MachineId;
 use common::api_fixtures::{create_managed_host, create_test_env};
 use const_format::concatcp;
+use model::allocation_type::AllocationType;
 use rpc::forge::forge_server::Forge;
 use sqlx::{Postgres, Row};
 
@@ -258,10 +259,7 @@ async fn test_dns_aaaa(pool: sqlx::PgPool) {
 
     // Insert an IPv6 address directly for this interface. This simulates what
     // would happen in a dual-stack environment once DHCPv6 is implemented.
-    sqlx::query("INSERT INTO machine_interface_addresses (interface_id, address) VALUES ($1, $2)")
-        .bind(interface.id)
-        .bind(ipv6_addr)
-        .execute(&mut *txn)
+    db::machine_interface_address::insert(&mut txn, interface.id, ipv6_addr, AllocationType::Dhcp)
         .await
         .unwrap();
 
@@ -360,10 +358,7 @@ async fn test_dns_aaaa_legacy(pool: sqlx::PgPool) {
         .unwrap();
 
     let ipv6_addr: IpAddr = "fd00::1".parse().unwrap();
-    sqlx::query("INSERT INTO machine_interface_addresses (interface_id, address) VALUES ($1, $2)")
-        .bind(interface.id)
-        .bind(ipv6_addr)
-        .execute(&mut *txn)
+    db::machine_interface_address::insert(&mut txn, interface.id, ipv6_addr, AllocationType::Dhcp)
         .await
         .unwrap();
     txn.commit().await.unwrap();

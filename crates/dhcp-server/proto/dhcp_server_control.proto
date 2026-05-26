@@ -48,6 +48,15 @@ message DhcpConfig {
     repeated string carbide_ntpservers = 6;
     string carbide_provisioning_server_ipv4 = 7;
     string carbide_dhcp_server = 8;
+    repeated string carbide_nameservers_v6 = 9;
+    repeated string carbide_ntpservers_v6 = 10;
+    optional string carbide_dhcp_server_v6 = 11;
+    // DHCPv6 splits address lifetime into preferred and valid states: after
+    // the preferred lifetime the address is deprecated for new use, but it
+    // remains usable until the valid lifetime expires. DHCPv4 has one lease
+    // validity duration plus renewal/rebinding timers instead.
+    uint32 preferred_lifetime_v6_secs = 12;
+    uint32 valid_lifetime_v6_secs = 13;
 }
 
 // Mirrors utils::models::dhcp::InterfaceInfo.
@@ -59,6 +68,14 @@ message InterfaceInfo {
     string fqdn = 4;
     optional string booturl = 5;
     optional uint32 mtu = 6;
+    optional InterfaceInfoV6 ipv6 = 7;
+}
+
+message InterfaceInfoV6 {
+    // Absent for SLAAC-only entries; present for stateful /128.
+    optional string address = 1;
+    optional string gateway = 2;
+    string prefix = 3;
 }
 
 // Mirrors utils::models::dhcp::HostConfig.

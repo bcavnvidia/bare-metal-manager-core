@@ -193,6 +193,10 @@ async fn test_discover_dpu_by_source_ip(
             circuit_id: None,
             remote_id: None,
             desired_address: None,
+            address_family: None,
+            message_kind: None,
+            observed_address: None,
+            duid: None,
         }))
         .await
         .unwrap()
@@ -232,6 +236,10 @@ async fn test_discover_dpu_not_create_machine(
             circuit_id: None,
             remote_id: None,
             desired_address: None,
+            address_family: None,
+            message_kind: None,
+            observed_address: None,
+            duid: None,
         }))
         .await
         .unwrap()

@@ -34,6 +34,7 @@ use db::{self, ObjectColumnFilter, dhcp_entry};
 use ipnetwork::IpNetwork;
 use itertools::Itertools;
 use mac_address::MacAddress;
+use model::allocation_type::AllocationType;
 use model::machine_interface::InterfaceType;
 use model::network_segment::NetworkSegmentType;
 use rpc::forge::ManagedHostNetworkConfigRequest;
@@ -549,10 +550,7 @@ async fn test_dhcp_record_address_family(
     let interface = &interfaces[0];
 
     let ipv6_addr: IpAddr = "fd00::42".parse().unwrap();
-    sqlx::query("INSERT INTO machine_interface_addresses (interface_id, address) VALUES ($1, $2)")
-        .bind(interface.id)
-        .bind(ipv6_addr)
-        .execute(&mut *txn)
+    db::machine_interface_address::insert(&mut txn, interface.id, ipv6_addr, AllocationType::Dhcp)
         .await?;
 
     // The machine_dhcp_records view requires the address is contained within

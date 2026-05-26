@@ -2996,6 +2996,26 @@ mod tests {
             expected.carbide_provisioning_server_ipv4
         );
         assert_eq!(received.carbide_dhcp_server, expected.carbide_dhcp_server);
+        assert_eq!(
+            received.carbide_nameservers_v6,
+            expected.carbide_nameservers_v6
+        );
+        assert_eq!(
+            received.carbide_ntpservers_v6,
+            expected.carbide_ntpservers_v6
+        );
+        assert_eq!(
+            received.carbide_dhcp_server_v6,
+            expected.carbide_dhcp_server_v6
+        );
+        assert_eq!(
+            received.preferred_lifetime_v6_secs,
+            expected.preferred_lifetime_v6_secs
+        );
+        assert_eq!(
+            received.valid_lifetime_v6_secs,
+            expected.valid_lifetime_v6_secs
+        );
     }
 
     fn validate_host_config(received: HostConfig, expected: HostConfig) {
@@ -3018,6 +3038,7 @@ mod tests {
             assert_eq!(ip_config_received.gateway, ip_config_expected.gateway);
             assert_eq!(ip_config_received.address, ip_config_expected.address);
             assert_eq!(ip_config_received.prefix, ip_config_expected.prefix);
+            assert_eq!(ip_config_received.ipv6, ip_config_expected.ipv6);
         }
     }
 
@@ -3139,6 +3160,11 @@ mod tests {
             rebinding_time_secs: 432000,
             carbide_api_url: None,
             carbide_dhcp_server: Ipv4Addr::from([10, 217, 5, 39]),
+            carbide_nameservers_v6: vec![],
+            carbide_ntpservers_v6: vec![],
+            carbide_dhcp_server_v6: None,
+            preferred_lifetime_v6_secs: 0,
+            valid_lifetime_v6_secs: 0,
         };
 
         let mut network_config = rpc::ManagedHostNetworkConfigResponse {
@@ -3331,6 +3357,11 @@ mod tests {
             rebinding_time_secs: 432000,
             carbide_api_url: None,
             carbide_dhcp_server: Ipv4Addr::from([10, 217, 5, 39]),
+            carbide_nameservers_v6: vec![],
+            carbide_ntpservers_v6: vec![],
+            carbide_dhcp_server_v6: None,
+            preferred_lifetime_v6_secs: 0,
+            valid_lifetime_v6_secs: 0,
         };
         let dhcp_contents = super::read_limited(g.path())?;
         assert!(dhcp_contents.contains("vlan196"));

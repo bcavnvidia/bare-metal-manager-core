@@ -31,6 +31,8 @@ pub struct Dpu {}
 
 fn from_host_conf(value: &InterfaceInfo, interface_id: MachineInterfaceId) -> DhcpRecord {
     // Fill only needed fields. Rest are left empty or none.
+    // TODO(ipv6-only): the future v6 branch will read `value.ipv6`,
+    // but host config still needs a v4 entry until rpc-utils relaxes it.
     DhcpRecord {
         machine_id: None,
         machine_interface_id: Some(interface_id),
@@ -44,6 +46,8 @@ fn from_host_conf(value: &InterfaceInfo, interface_id: MachineInterfaceId) -> Dh
         gateway: Some(value.gateway.to_string()),
         booturl: value.booturl.clone(),
         last_invalidation_time: None,
+        preferred_lifetime_v6_secs: None,
+        valid_lifetime_v6_secs: None,
     }
 }
 

@@ -97,6 +97,10 @@ impl ApiClient {
             mac_address: mac_address.to_string(),
             circuit_id,
             relay_address,
+            address_family: None,
+            message_kind: None,
+            observed_address: None,
+            duid: None,
             ..default_data
         };
         let out = self

@@ -34,6 +34,8 @@ impl From<DhcpRecord> for rpc::forge::DhcpRecord {
             gateway: record.gateway.map(|gw| gw.to_string()),
             booturl: None, // TODO(ajf): extend database, synthesize URL
             last_invalidation_time: Some(record.last_invalidation_time.into()),
+            preferred_lifetime_v6_secs: None,
+            valid_lifetime_v6_secs: None,
         }
     }
 }

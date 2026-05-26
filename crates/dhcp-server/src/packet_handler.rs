@@ -177,6 +177,10 @@ impl DecodedPacket {
             circuit_id: handler.get_circuit_id(self, circuit_id),
             remote_id: self.get_remote_id(),
             desired_address: None,
+            address_family: None,
+            message_kind: None,
+            observed_address: None,
+            duid: None,
         }
     }
 
@@ -542,6 +546,7 @@ mod test {
             fqdn: "fqdn1".to_string(),
             booturl: None,
             mtu: None,
+            ipv6: None,
         };
         let interface_mtu_9000 = crate::packet_handler::InterfaceInfo {
             address: <std::net::Ipv4Addr as std::str::FromStr>::from_str("20.22.2.2")
@@ -554,6 +559,7 @@ mod test {
             fqdn: "fqdn2".to_string(),
             booturl: None,
             mtu: Some(9000),
+            ipv6: None,
         };
         let mut interface_mtu_65537 = interface_mtu_none.clone();
         interface_mtu_65537.mtu = Some(65537);

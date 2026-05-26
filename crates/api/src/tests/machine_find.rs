@@ -26,6 +26,7 @@ use data_encoding::BASE32_DNSSEC;
 use db::ObjectFilter;
 use itertools::Itertools;
 use mac_address::MacAddress;
+use model::allocation_type::AllocationType;
 use model::expected_machine::ExpectedMachineData;
 use model::hardware_info::HardwareInfo;
 use model::machine::machine_id::host_id_from_dpu_hardware_info;
@@ -131,10 +132,7 @@ async fn test_find_machine_by_ipv6(pool: sqlx::PgPool) {
 
     // Add an IPv6 address to the interface.
     let ipv6: IpAddr = "fd00::100".parse().unwrap();
-    sqlx::query("INSERT INTO machine_interface_addresses (interface_id, address) VALUES ($1, $2)")
-        .bind(interface_id)
-        .bind(ipv6)
-        .execute(&mut *txn)
+    db::machine_interface_address::insert(&mut txn, interface_id, ipv6, AllocationType::Dhcp)
         .await
         .unwrap();
     txn.commit().await.unwrap();

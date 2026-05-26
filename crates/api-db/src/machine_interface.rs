@@ -1244,7 +1244,8 @@ async fn insert_machine_interface_address(
     address: &IpAddr,
     allocation_type: model::allocation_type::AllocationType,
 ) -> DatabaseResult<()> {
-    let query = "INSERT INTO machine_interface_addresses (interface_id, address, allocation_type) VALUES ($1::uuid, $2::inet, $3)";
+    let query = "INSERT INTO machine_interface_addresses (interface_id, segment_id, address, allocation_type)
+        VALUES ($1::uuid, (SELECT segment_id FROM machine_interfaces WHERE id = $1::uuid), $2::inet, $3)";
     sqlx::query(query)
         .bind(interface_id)
         .bind(address)
@@ -1867,7 +1868,7 @@ async fn move_dhcp_address_to_interface(
 ) -> DatabaseResult<()> {
     let query = r#"
 UPDATE machine_interface_addresses AS mia
-SET interface_id = $1
+SET interface_id = $1, segment_id = destination_interface.segment_id
 FROM machine_interfaces source_interface, machine_interfaces destination_interface
 WHERE mia.interface_id = $2
   AND mia.address = $3::inet
@@ -1966,7 +1967,16 @@ pub async fn update_segment_id(
     segment_id: NetworkSegmentId,
     domain_id: Option<DomainId>,
 ) -> DatabaseResult<()> {
-    let query = "UPDATE machine_interfaces SET segment_id = $1, domain_id = $2 WHERE id = $3";
+    let query = "WITH updated_interface AS (
+            UPDATE machine_interfaces
+               SET segment_id = $1, domain_id = $2
+             WHERE id = $3
+         RETURNING id
+        )
+        UPDATE machine_interface_addresses mia
+           SET segment_id = $1
+          FROM updated_interface
+         WHERE mia.interface_id = updated_interface.id";
     sqlx::query(query)
         .bind(segment_id)
         .bind(domain_id)

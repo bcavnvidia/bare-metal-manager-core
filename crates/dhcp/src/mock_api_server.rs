@@ -63,6 +63,8 @@ pub fn base_dhcp_response(mac_address: MacAddress) -> rpc::DhcpRecord {
         gateway: Some("172.20.0.1".to_string()),
         booturl: None,
         last_invalidation_time: None,
+        preferred_lifetime_v6_secs: None,
+        valid_lifetime_v6_secs: None,
     }
 }
 

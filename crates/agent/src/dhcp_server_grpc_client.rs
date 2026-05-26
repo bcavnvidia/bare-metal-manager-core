@@ -21,7 +21,7 @@ pub mod proto {
 
 use carbide_rpc_utils::dhcp::{
     DhcpConfig as ModelDhcpConfig, HostConfig as ModelHostConfig,
-    InterfaceInfo as ModelInterfaceInfo,
+    InterfaceInfo as ModelInterfaceInfo, InterfaceInfoV6 as ModelInterfaceInfoV6,
 };
 use carbide_uuid::machine::MachineInterfaceId;
 use proto::dhcp_server_control_client::DhcpServerControlClient;
@@ -47,6 +47,29 @@ impl From<ModelDhcpConfig> for proto::DhcpConfig {
                 .collect(),
             carbide_provisioning_server_ipv4: c.carbide_provisioning_server_ipv4.to_string(),
             carbide_dhcp_server: c.carbide_dhcp_server.to_string(),
+            carbide_nameservers_v6: c
+                .carbide_nameservers_v6
+                .iter()
+                .map(|ip| ip.to_string())
+                .collect(),
+            carbide_ntpservers_v6: c
+                .carbide_ntpservers_v6
+                .iter()
+                .map(|ip| ip.to_string())
+                .collect(),
+            carbide_dhcp_server_v6: c.carbide_dhcp_server_v6.map(|ip| ip.to_string()),
+            preferred_lifetime_v6_secs: c.preferred_lifetime_v6_secs,
+            valid_lifetime_v6_secs: c.valid_lifetime_v6_secs,
+        }
+    }
+}
+
+impl From<ModelInterfaceInfoV6> for proto::InterfaceInfoV6 {
+    fn from(i: ModelInterfaceInfoV6) -> Self {
+        proto::InterfaceInfoV6 {
+            address: i.address.map(|ip| ip.to_string()),
+            gateway: i.gateway.map(|ip| ip.to_string()),
+            prefix: i.prefix,
         }
     }
 }
@@ -60,6 +83,7 @@ impl From<ModelInterfaceInfo> for proto::InterfaceInfo {
             fqdn: i.fqdn,
             booturl: i.booturl,
             mtu: i.mtu,
+            ipv6: i.ipv6.map(Into::into),
         }
     }
 }

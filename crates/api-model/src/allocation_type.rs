@@ -26,12 +26,15 @@ use crate::address_selection_strategy::AddressSelectionStrategy;
 ///   or a DHCP service that integrates directly with carbide-api.
 /// - `Static`: These addresses are assigned and managed explicitly by
 ///   an operator or operator-provided configuration.
+/// - `Slaac`: These addresses are observed through DHCPv6 stateless
+///   configuration flows and computed server-side from the segment prefix.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, sqlx::Type, Serialize, Deserialize)]
 #[sqlx(type_name = "text", rename_all = "snake_case")]
 #[serde(rename_all = "snake_case")]
 pub enum AllocationType {
     Dhcp,
     Static,
+    Slaac,
 }
 
 impl From<AddressSelectionStrategy> for AllocationType {
@@ -53,7 +56,11 @@ pub enum AssignStaticResult {
     Assigned,
     /// An existing static address was replaced.
     ReplacedStatic,
-    /// An existing DHCP allocation was replaced.
+    /// An existing DHCP-managed allocation was replaced.
+    ///
+    /// SLAAC observations currently also use this result when replaced
+    /// by a static address because the public API does not expose a
+    /// separate status for that distinction.
     ///
     /// If you "replace" a DHCP allocation with the same address
     /// (effectively making a static DHCP  reservation), then it's
@@ -135,6 +142,9 @@ mod tests {
         let static_: AllocationType = serde_json::from_str(r#""static""#).unwrap();
         assert_eq!(static_, AllocationType::Static);
 
+        let slaac: AllocationType = serde_json::from_str(r#""slaac""#).unwrap();
+        assert_eq!(slaac, AllocationType::Slaac);
+
         assert_eq!(
             serde_json::to_string(&AllocationType::Dhcp).unwrap(),
             r#""dhcp""#
@@ -142,6 +152,10 @@ mod tests {
         assert_eq!(
             serde_json::to_string(&AllocationType::Static).unwrap(),
             r#""static""#
+        );
+        assert_eq!(
+            serde_json::to_string(&AllocationType::Slaac).unwrap(),
+            r#""slaac""#
         );
     }
 }

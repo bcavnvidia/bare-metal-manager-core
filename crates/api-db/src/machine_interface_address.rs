@@ -154,7 +154,8 @@ pub async fn insert(
     address: IpAddr,
     allocation_type: AllocationType,
 ) -> Result<(), DatabaseError> {
-    let query = "INSERT INTO machine_interface_addresses (interface_id, address, allocation_type) VALUES ($1::uuid, $2::inet, $3)";
+    let query = "INSERT INTO machine_interface_addresses (interface_id, segment_id, address, allocation_type)
+        VALUES ($1::uuid, (SELECT segment_id FROM machine_interfaces WHERE id = $1::uuid), $2::inet, $3)";
     sqlx::query(query)
         .bind(interface_id)
         .bind(address)
@@ -172,6 +173,8 @@ pub async fn insert(
 /// - `Static`: the old static address is replaced.
 /// - `Dhcp`: the DHCP allocation is removed and replaced with the
 ///   static assignment.
+/// - `Slaac`: the observed SLAAC address is removed and replaced with
+///   the static assignment.
 #[allow(txn_held_across_await)]
 pub async fn assign_static(
     txn: &mut PgConnection,
@@ -183,9 +186,9 @@ pub async fn assign_static(
     let existing = find_allocation_type_for_family(&mut *txn, interface_id, family).await?;
 
     let result = match existing {
-        Some(AllocationType::Dhcp) => {
-            delete_by_interface_family(&mut *txn, interface_id, family, AllocationType::Dhcp)
-                .await?;
+        Some(allocation_type @ (AllocationType::Dhcp | AllocationType::Slaac)) => {
+            delete_by_interface_family(&mut *txn, interface_id, family, allocation_type).await?;
+            // TODO(ipv6): expose a dedicated replaced-SLAAC API status if callers need it.
             AssignStaticResult::ReplacedDhcp
         }
         Some(AllocationType::Static) => {
@@ -267,7 +270,7 @@ pub async fn has_address_for_family(
 }
 
 /// Row shape for [`find_by_address`]: interface identity, owning segment, and how the address was
-/// assigned (DHCP vs static / operator-configured).
+/// assigned (DHCP, SLAAC observation, or static / operator-configured).
 #[derive(Debug, FromRow)]
 pub struct MachineInterfaceSearchResult {
     pub id: MachineInterfaceId,
@@ -275,4 +278,75 @@ pub struct MachineInterfaceSearchResult {
     pub name: String,
     pub network_segment_type: NetworkSegmentType,
     pub allocation_type: AllocationType,
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// Verifies SLAAC allocations persist and segment-scoped address uniqueness is enforced.
+    #[crate::sqlx_test]
+    async fn slaac_roundtrip_and_segment_address_uniqueness(
+        pool: sqlx::PgPool,
+    ) -> Result<(), Box<dyn std::error::Error>> {
+        let mut txn = pool.begin().await?;
+
+        // Create one network segment and two interfaces with distinct MACs.
+        let segment_id: NetworkSegmentId = sqlx::query_scalar(
+            "INSERT INTO network_segments (name, version) VALUES ($1, 'V1-T0') RETURNING id",
+        )
+        .bind("slaac-uniqueness")
+        .fetch_one(&mut *txn)
+        .await?;
+        let first_interface_id: MachineInterfaceId = sqlx::query_scalar(
+            "INSERT INTO machine_interfaces
+                (segment_id, mac_address, primary_interface, hostname)
+             VALUES ($1, '02:00:00:00:00:01'::macaddr, true, 'first')
+             RETURNING id",
+        )
+        .bind(segment_id)
+        .fetch_one(&mut *txn)
+        .await?;
+        let second_interface_id: MachineInterfaceId = sqlx::query_scalar(
+            "INSERT INTO machine_interfaces
+                (segment_id, mac_address, primary_interface, hostname)
+             VALUES ($1, '02:00:00:00:00:02'::macaddr, true, 'second')
+             RETURNING id",
+        )
+        .bind(segment_id)
+        .fetch_one(&mut *txn)
+        .await?;
+        let address = "2001:db8::10".parse()?;
+
+        // Persist a SLAAC-observed address and verify the text enum round-trips.
+        insert(&mut txn, first_interface_id, address, AllocationType::Slaac).await?;
+        let addresses = find_for_interface(&mut txn, first_interface_id).await?;
+        assert_eq!(addresses.len(), 1);
+        assert_eq!(addresses[0].address, address);
+        assert_eq!(addresses[0].allocation_type, AllocationType::Slaac);
+
+        // The same address cannot be claimed by another interface in the segment.
+        let duplicate = insert(
+            &mut txn,
+            second_interface_id,
+            address,
+            AllocationType::Slaac,
+        )
+        .await
+        .expect_err("duplicate segment address should fail");
+        let constraint = match duplicate {
+            DatabaseError::Sqlx(err) => err
+                .source
+                .as_database_error()
+                .and_then(|db_err| db_err.constraint().map(str::to_owned)),
+            other => panic!("expected sqlx constraint error, got {other:?}"),
+        };
+        assert_eq!(
+            constraint.as_deref(),
+            Some("machine_interface_addresses_segment_id_address_key"),
+        );
+
+        txn.rollback().await?;
+        Ok(())
+    }
 }

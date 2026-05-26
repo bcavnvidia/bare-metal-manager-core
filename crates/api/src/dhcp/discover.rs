@@ -80,6 +80,8 @@ async fn handle_overlay_from_dpa(
         mtu: SPX_MTU,
         fqdn: String::new(),
         prefix,
+        preferred_lifetime_v6_secs: None,
+        valid_lifetime_v6_secs: None,
     })))
 }
 
@@ -119,6 +121,8 @@ async fn handle_underlay_from_dpa(
         mtu: SPX_MTU,
         fqdn: String::new(),
         prefix,
+        preferred_lifetime_v6_secs: None,
+        valid_lifetime_v6_secs: None,
     })))
 }
 

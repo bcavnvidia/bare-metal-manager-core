@@ -16,7 +16,7 @@
  */
 use std::collections::{BTreeMap, HashMap};
 use std::fs;
-use std::net::Ipv4Addr;
+use std::net::{Ipv4Addr, Ipv6Addr};
 use std::str::FromStr;
 
 use carbide_uuid::UuidConversionError;
@@ -40,6 +40,22 @@ pub struct DhcpConfig {
     pub carbide_ntpservers: Vec<Ipv4Addr>,
     pub carbide_provisioning_server_ipv4: Ipv4Addr,
     pub carbide_dhcp_server: Ipv4Addr,
+    #[serde(default)]
+    pub carbide_nameservers_v6: Vec<Ipv6Addr>,
+    #[serde(default)]
+    pub carbide_ntpservers_v6: Vec<Ipv6Addr>,
+    #[serde(default)]
+    pub carbide_dhcp_server_v6: Option<Ipv6Addr>,
+    /// DHCPv6 lifetime while the address is preferred for new use.
+    /// After this expires, the address is deprecated but still usable until
+    /// valid_lifetime_v6_secs.
+    #[serde(default)]
+    pub preferred_lifetime_v6_secs: u32,
+    /// DHCPv6 lifetime before the address becomes invalid.
+    /// DHCPv4 has one lease duration plus renewal/rebinding timers, not this
+    /// preferred/valid split.
+    #[serde(default)]
+    pub valid_lifetime_v6_secs: u32,
 }
 
 #[derive(thiserror::Error, Debug)]
@@ -72,6 +88,11 @@ impl Default for DhcpConfig {
             // These two must be updated with valid values.
             carbide_provisioning_server_ipv4: Ipv4Addr::from([127, 0, 0, 1]),
             carbide_dhcp_server: Ipv4Addr::from([127, 0, 0, 1]),
+            carbide_nameservers_v6: vec![],
+            carbide_ntpservers_v6: vec![],
+            carbide_dhcp_server_v6: None,
+            preferred_lifetime_v6_secs: 0,
+            valid_lifetime_v6_secs: 0,
         }
     }
 }
@@ -113,7 +134,20 @@ pub struct InterfaceInfo {
     pub booturl: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub mtu: Option<u32>,
+    // TODO(ipv6-only): the v4 fields above are currently required.
+    // IPv6-only hosts will need them to become Option<_>.
+    #[serde(default)]
+    pub ipv6: Option<InterfaceInfoV6>,
 }
+
+/// IPv6 DHCP information for a host-facing interface.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct InterfaceInfoV6 {
+    pub address: Option<Ipv6Addr>,
+    pub gateway: Option<Ipv6Addr>,
+    pub prefix: String,
+}
+
 impl Default for InterfaceInfo {
     fn default() -> Self {
         InterfaceInfo {
@@ -123,6 +157,7 @@ impl Default for InterfaceInfo {
             fqdn: Default::default(),
             booturl: None,
             mtu: None,
+            ipv6: None,
         }
     }
 }
@@ -192,6 +227,7 @@ impl TryFrom<::rpc::forge::FlatInterfaceConfig> for InterfaceInfo {
             fqdn: value.fqdn,
             booturl: value.booturl,
             mtu: value.mtu,
+            ipv6: None,
         })
     }
 }
@@ -291,5 +327,69 @@ impl IntoIterator for DhcpTimestamps {
 
     fn into_iter(self) -> Self::IntoIter {
         self.timestamps.into_iter()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// Verifies new IPv6 DHCP config fields preserve serde round-trips.
+    #[test]
+    fn dhcp_config_v6_fields_roundtrip() {
+        // Build config with the new additive v6 fields populated.
+        let config = DhcpConfig {
+            carbide_nameservers_v6: vec!["2001:db8::53".parse().unwrap()],
+            carbide_ntpservers_v6: vec!["2001:db8::123".parse().unwrap()],
+            carbide_dhcp_server_v6: Some("2001:db8::1".parse().unwrap()),
+            preferred_lifetime_v6_secs: 3600,
+            valid_lifetime_v6_secs: 7200,
+            ..Default::default()
+        };
+
+        // Round-trip through JSON to ensure serde keeps the new fields.
+        let roundtrip: DhcpConfig = serde_json::from_str(&serde_json::to_string(&config).unwrap())
+            .expect("dhcp config should round-trip");
+        assert_eq!(
+            roundtrip.carbide_nameservers_v6,
+            config.carbide_nameservers_v6
+        );
+        assert_eq!(
+            roundtrip.carbide_ntpservers_v6,
+            config.carbide_ntpservers_v6
+        );
+        assert_eq!(
+            roundtrip.carbide_dhcp_server_v6,
+            config.carbide_dhcp_server_v6
+        );
+        assert_eq!(roundtrip.preferred_lifetime_v6_secs, 3600);
+        assert_eq!(roundtrip.valid_lifetime_v6_secs, 7200);
+    }
+
+    /// Verifies InterfaceInfo keeps both stateful and SLAAC-only v6 forms.
+    #[test]
+    fn interface_info_v6_fields_roundtrip() {
+        // Build a stateful v6 interface entry.
+        let stateful = InterfaceInfo {
+            ipv6: Some(InterfaceInfoV6 {
+                address: Some("2001:db8::10".parse().unwrap()),
+                gateway: Some("2001:db8::1".parse().unwrap()),
+                prefix: "2001:db8::/64".to_string(),
+            }),
+            ..Default::default()
+        };
+
+        // Round-trip through JSON to ensure the v6 block survives.
+        let roundtrip: InterfaceInfo =
+            serde_json::from_str(&serde_json::to_string(&stateful).unwrap())
+                .expect("interface info should round-trip");
+        assert_eq!(roundtrip.ipv6, stateful.ipv6);
+
+        // Missing v6 remains backward-compatible and deserializes as None.
+        let legacy: InterfaceInfo = serde_json::from_str(
+            r#"{"address":"0.0.0.0","gateway":"0.0.0.0","prefix":"","fqdn":"","booturl":null}"#,
+        )
+        .expect("legacy interface info should parse");
+        assert!(legacy.ipv6.is_none());
     }
 }
