@@ -899,6 +899,13 @@ impl Forge for Api {
         crate::handlers::credential::get_bmc_credentals(self, request).await
     }
 
+    async fn get_switch_nvos_credentials(
+        &self,
+        request: Request<rpc::GetSwitchNvosCredentialsRequest>,
+    ) -> Result<Response<rpc::GetBmcCredentialsResponse>, Status> {
+        crate::handlers::credential::get_switch_nvos_credentials(self, request).await
+    }
+
     /// Network status of each managed host, as reported by forge-dpu-agent.
     /// For use by forge-admin-cli
     ///
